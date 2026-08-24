@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>GPS Tracker – PotholeWatch</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f172a;--bg2:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--primary:#3b82f6}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;gap:1.25rem}
+
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:100%;max-width:380px}
+    .card-title{font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;font-weight:600}
+
+    /* Status GPS */
+    .gps-status{display:flex;align-items:center;gap:10px;padding:.75rem 1rem;border-radius:10px;background:rgba(0,0,0,.2);border:1px solid var(--border);margin-bottom:1rem}
+    .gps-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0}
+    .gps-dot.ok{background:var(--green);animation:blink 1.5s infinite}
+    .gps-dot.error{background:var(--red)}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    .gps-text{font-size:.82rem}
+
+    /* Koordinat */
+    .coord-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem}
+    .coord-box{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem}
+    .coord-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+    .coord-val{font-size:.95rem;font-weight:600;font-variant-numeric:tabular-nums}
+    .coord-acc{font-size:.7rem;color:var(--muted)}
+
+    /* Tombol utama */
+    .btn-main{width:100%;padding:.85rem;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:10px}
+    .btn-main.start{background:var(--green);color:#fff;box-shadow:0 0 20px rgba(34,197,94,.35)}
+    .btn-main.stop{background:var(--red);color:#fff;animation:pulsebtn 1.8s infinite}
+    .btn-main:disabled{opacity:.45;cursor:not-allowed;animation:none}
+    @keyframes pulsebtn{0%,100%{box-shadow:0 0 14px rgba(239,68,68,.3)}50%{box-shadow:0 0 28px rgba(239,68,68,.6)}}
+    .btn-dot{width:10px;height:10px;border-radius:50%;background:#fff;flex-shrink:0}
+    .btn-main.stop .btn-dot{animation:blink .8s infinite}
+
+    /* Statistik jalan */
+    .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+    .stat-box{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;text-align:center}
+    .stat-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+    .stat-val{font-size:1.4rem;font-weight:800}
+    .stat-val.green{color:var(--green)}.stat-val.yellow{color:var(--yellow)}.stat-val.red{color:var(--red)}
+
+    /* Log kiriman */
+    .log-wrap{max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+    .log-item{font-size:.72rem;padding:.3rem .5rem;border-radius:5px;background:rgba(0,0,0,.2);color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+    .log-item.ok{border-left:3px solid var(--green)}
+    .log-item.err{border-left:3px solid var(--red)}
+    .log-empty{font-size:.78rem;color:var(--muted);text-align:center;padding:.5rem}
+
+    /* Petunjuk */
+    .hint{font-size:.75rem;color:var(--muted);text-align:center;line-height:1.7;padding:.5rem}
+  </style>
+</head>
+<body>
+
+  <!-- Status GPS -->
+  <div class="card">
+    <div class="card-title">📡 Status GPS</div>
+    <div class="gps-status">
+      <div class="gps-dot" id="gpsDot"></div>
+      <span class="gps-text" id="gpsText">Meminta izin GPS...</span>
+    </div>
+    <div class="coord-grid">
+      <div class="coord-box">
+        <div class="coord-label">Latitude</div>
+        <div class="coord-val" id="valLat">–</div>
+      </div>
+      <div class="coord-box">
+        <div class="coord-label">Longitude</div>
+        <div class="coord-val" id="valLng">–</div>
+      </div>
+      <div class="coord-box">
+        <div class="coord-label">Akurasi</div>
+        <div class="coord-val" id="valAcc">–</div>
+        <div class="coord-acc">meter</div>
+      </div>
+      <div class="coord-box">
+        <div class="coord-label">Kecepatan</div>
+        <div class="coord-val" id="valSpd">–</div>
+        <div class="coord-acc">km/h</div>
+      </div>
+    </div>
+
+    <!-- Tombol Start/Stop -->
+    <button class="btn-main start" id="btnMain" onclick="toggleTracking()" disabled>
+      <span class="btn-dot"></span>
+      <span id="btnLabel">Menunggu GPS...</span>
+    </button>
+  </div>
+
+  <!-- Statistik -->
+  <div class="card">
+    <div class="card-title">📊 STATISTIK PERJALANAN</div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-label">Jarak Tempuh</div>
+        <div class="stat-val" id="statDist">0</div>
+        <div style="font-size:.7rem;color:var(--muted)">meter</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Lubang</div>
+        <div class="stat-val red" id="statHoles">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log kiriman -->
+  <div class="card">
+    <div class="card-title">📋 Log GPS Terkirim</div>
+    <div class="log-wrap" id="logWrap">
+      <div class="log-empty">Belum ada kiriman</div>
+    </div>
+  </div>
+
+  <div class="hint">
+    Buka halaman ini di HP saat pengujian motor.<br>
+    Pastikan HP & laptop terhubung WiFi yang sama.
+  </div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────
+  // Ganti dengan IP laptop Anda (sama seperti di ESP32)
+  const SERVER = window.location.origin;
+  const GPS_INTERVAL_MS = 1000; // kirim GPS tiap 1 detik
+
+  // ── State ────────────────────────────────────────────────────────
+  let tracking = false;
+  let watchId  = null;
+  let sendTimer= null;
+  let currentPos = null;
+  let prevPos    = null;
+  let totalDist  = 0;   // meter
+  let totalHoles = 0;
+  let segmentCount = 0;
+  let logs = [];
+
+  // ── Minta izin GPS saat halaman dibuka ──────────────────────────
+  if (!navigator.geolocation) {
+    setGpsStatus('error', 'Browser tidak mendukung GPS');
+  } else {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        currentPos = pos.coords;
+        updateCoordDisplay(pos.coords);
+        setGpsStatus('ok', 'GPS siap');
+        document.getElementById('btnMain').disabled = false;
+        document.getElementById('btnLabel').textContent = 'Mulai Tracking';
+      },
+      err => setGpsStatus('error', 'GPS ditolak: ' + err.message),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  // ── Toggle tracking ──────────────────────────────────────────────
+  function toggleTracking() {
+    if (!tracking) startTracking();
+    else stopTracking();
+  }
+
+  function startTracking() {
+    tracking = true;
+    totalDist = 0; totalHoles = 0; prevPos = null;
+    logs = [];
+    document.getElementById('logWrap').innerHTML = '<div class="log-empty">Mengirim data GPS...</div>';
+
+    const btn = document.getElementById('btnMain');
+    btn.className = 'btn-main stop';
+    document.getElementById('btnLabel').textContent = 'Stop Tracking';
+
+    // Watch posisi GPS terus-menerus
+    watchId = navigator.geolocation.watchPosition(
+      pos => {
+        currentPos = pos.coords;
+        updateCoordDisplay(pos.coords);
+        setGpsStatus('ok', 'GPS aktif – tracking berjalan');
+      },
+      err => setGpsStatus('error', 'GPS error: ' + err.message),
+      { enableHighAccuracy: true, maximumAge: 0 }
+    );
+
+    // Kirim koordinat ke server tiap GPS_INTERVAL_MS
+    sendTimer = setInterval(sendGPS, GPS_INTERVAL_MS);
+  }
+
+  function stopTracking() {
+    tracking = false;
+    navigator.geolocation.clearWatch(watchId);
+    clearInterval(sendTimer);
+
+    const btn = document.getElementById('btnMain');
+    btn.className = 'btn-main start';
+    document.getElementById('btnLabel').textContent = 'Mulai Tracking';
+    setGpsStatus('ok', 'Tracking dihentikan');
+  }
+
+ // ── Kirim koordinat ke Flask ─────────────────────────────────────
+ async function sendGPS() {
+    if (!currentPos) return;
+
+    // Hitung jarak dari posisi sebelumnya
+    let distStep = 0;
+    if (prevPos) {
+      distStep = haversine(prevPos.latitude, prevPos.longitude,
+                           currentPos.latitude, currentPos.longitude);
+      totalDist += distStep;
+    }
+    prevPos = { latitude: currentPos.latitude, longitude: currentPos.longitude };
+
+    const payload = {
+      lat:       currentPos.latitude,
+      lng:       currentPos.longitude,
+      accuracy:  Math.round(currentPos.accuracy),
+      speed:     currentPos.speed ? Math.round(currentPos.speed * 3.6) : 0,
+      dist_step: Math.round(distStep),
+      total_dist: Math.round(totalDist)
+    };
+
+    try {
+      // 1. Kirim koordinat GPS HP ke backend
+      await fetch(SERVER + '/api/gps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      // 2. AMBIL STATUS TERBARU LANGSUNG DARI DATABASE SERVER (SOLUSI FIX)
+      const statusRes  = await fetch(SERVER + '/api/gps/status');
+      const statusData = await statusRes.json();
+
+      totalHoles   = statusData.total_holes; // ← Sekarang ter-update real-time dari Database!
+      segmentCount = statusData.segment_count;
+      
+      updateStats();
+      addLog('ok', `${Math.round(totalDist)}m | ${totalHoles} lubang terdeteksi`);
+      
+    } catch (e) {
+      addLog('err', 'Gagal kirim: ' + e.message);
+    }
+  }
+
+  // ── Haversine (hitung jarak 2 koordinat GPS) ─────────────────────
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = rad(lat2 - lat1);
+    const dLon = rad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  function rad(d) { return d * Math.PI / 180; }
+
+  // ── Update tampilan ──────────────────────────────────────────────
+  function updateCoordDisplay(c) {
+    document.getElementById('valLat').textContent = c.latitude.toFixed(6);
+    document.getElementById('valLng').textContent = c.longitude.toFixed(6);
+    document.getElementById('valAcc').textContent = Math.round(c.accuracy);
+    document.getElementById('valSpd').textContent =
+      c.speed ? Math.round(c.speed * 3.6) : '0';
+  }
+
+  function updateStats() {
+    document.getElementById('statDist').textContent  = Math.round(totalDist);
+    document.getElementById('statHoles').textContent = totalHoles;
+  }
+
+  function setGpsStatus(type, msg) {
+    const dot = document.getElementById('gpsDot');
+    dot.className = 'gps-dot' + (type === 'ok' ? ' ok' : type === 'error' ? ' error' : '');
+    document.getElementById('gpsText').textContent = msg;
+  }
+
+  function addLog(type, msg) {
+    const time = new Date().toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    logs.unshift({ type, msg, time });
+    if (logs.length > 20) logs.pop();
+    const wrap = document.getElementById('logWrap');
+    wrap.innerHTML = logs.map(l =>
+      `<div class="log-item ${l.type}"><span>${l.msg}</span><span>${l.time}</span></div>`
+    ).join('');
+  }
+</script>
+</body>
+</html>

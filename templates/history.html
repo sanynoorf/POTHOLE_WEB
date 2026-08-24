@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Riwayat Data – ROADWATCH</title>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#1e4db7"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="ROADWATCH"/>
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:#0d1f4e;--navy2:#1a3272;--blue2:#2563eb;
+      --white:#fff;--gray:#f0f4f8;--border:#dde3ee;
+      --text:#1a2744;--muted:#64748b;
+      --green:#16a34a;--gbg:#f0fdf4;--gbd:#86efac;
+      --yellow:#d97706;--ybg:#fffbeb;--ybd:#fcd34d;
+      --red:#dc2626;--rbg:#fef2f2;--rbd:#fca5a5;
+      --sidebar:220px;
+      --sat:env(safe-area-inset-top);
+      --sab:env(safe-area-inset-bottom);
+    }
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gray);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+
+    /* ── Sidebar ── */
+    .sidebar{width:var(--sidebar);background:var(--navy);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200}
+    .sb-brand{padding:1rem;border-bottom:1px solid rgba(255,255,255,.08)}
+    .sb-logo{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+    .sb-logo-icon{width:40px;height:40px;background:var(--blue2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;border:2px solid rgba(255,255,255,.15);flex-shrink:0}
+    .sb-logo-name{color:#fff;font-weight:800;font-size:.9rem;letter-spacing:.03em}
+    .sb-logo-sub{color:#93c5fd;font-size:.62rem;line-height:1.4}
+    .sb-nav{flex:1;padding:.6rem .5rem;display:flex;flex-direction:column;gap:2px}
+    .sb-item{display:flex;align-items:center;gap:8px;padding:.52rem .75rem;border-radius:7px;color:rgba(255,255,255,.5);text-decoration:none;font-size:.77rem;font-weight:500;cursor:pointer;border:none;background:none;width:100%;transition:all .15s;text-align:left}
+    .sb-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sb-item.active{background:var(--blue2);color:#fff;font-weight:700}
+    .sb-icon{font-size:.88rem;width:18px;text-align:center;flex-shrink:0}
+    .sb-footer{padding:.7rem 1rem;border-top:1px solid rgba(255,255,255,.08);text-align:center;color:rgba(255,255,255,.28);font-size:.6rem;line-height:1.7}
+
+    /* ── Bottom Nav Mobile ── */
+    .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:1px solid rgba(255,255,255,.1);z-index:300;padding-bottom:var(--sab)}
+    .bn-list{display:flex}
+    .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:.55rem .4rem;color:rgba(255,255,255,.45);font-size:.58rem;cursor:pointer;border:none;background:none;transition:color .15s;text-decoration:none}
+    .bn-item.active,.bn-item:hover{color:#60a5fa}
+    .bn-icon{font-size:1.15rem}
+
+    /* ── Wrapper ── */
+    .wrapper{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-width:0}
+
+    /* ── Top Header ── */
+    .top-hdr{background:var(--navy);padding:.52rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-shrink:0;padding-top:calc(.52rem + var(--sat))}
+    .top-title{background:var(--blue2);color:#fff;font-weight:700;font-size:.75rem;padding:.3rem 1rem;border-radius:6px;letter-spacing:.03em}
+    .top-right{display:flex;align-items:center;gap:.75rem}
+    .top-time{font-weight:700;font-size:.82rem;color:#fff;font-variant-numeric:tabular-nums}
+    .sys-badge{display:flex;align-items:center;gap:4px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;padding:.22rem .65rem;border-radius:20px;font-size:.65rem;font-weight:600}
+    .sys-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:blink 1.5s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* ── Content ── */
+    .content{flex:1;padding:1.1rem 1.25rem;display:flex;flex-direction:column;gap:1rem;padding-bottom:calc(1rem + var(--sab))}
+
+    /* ── Stat Cards ── */
+    .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem}
+    .stat-card{background:#fff;border:1px solid var(--border);border-radius:11px;padding:.85rem 1rem;display:flex;align-items:center;gap:.75rem;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+    .stat-card-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+    .ic-b{background:#eff6ff}.ic-r{background:#fef2f2}.ic-y{background:#fffbeb}.ic-g{background:#f0fdf4}
+    .stat-card-label{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+    .stat-card-val{font-size:1.4rem;font-weight:800;line-height:1.1}
+    .c-blue{color:var(--blue2)}.c-red{color:var(--red)}.c-yellow{color:var(--yellow)}.c-green{color:var(--green)}
+
+    /* ── Tabel Card ── */
+    .white-card{background:#fff;border:1px solid var(--border);border-radius:11px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+    .card-hdr{padding:.7rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+    .card-hdr-title{font-size:.82rem;font-weight:700;display:flex;align-items:center;gap:.4rem}
+    .card-hdr-right{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+    .search-input{padding:.3rem .65rem;border-radius:6px;border:1px solid var(--border);font-size:.72rem;width:150px;color:var(--text)}
+    .btn-action{padding:.3rem .8rem;border-radius:6px;font-size:.7rem;cursor:pointer;font-weight:600;white-space:nowrap;transition:opacity .15s;border:none}
+    .btn-action:hover{opacity:.85}
+    .btn-blue{background:var(--blue2);color:#fff}
+    .btn-red{background:var(--red);color:#fff}
+
+    /* ── Tabel ── */
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:.75rem}
+    th{padding:.5rem .85rem;text-align:left;color:var(--muted);font-weight:600;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:#fafbff;white-space:nowrap}
+    td{padding:.5rem .85rem;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#fafbff}
+
+    .badge{padding:2px 8px;border-radius:9px;font-size:.65rem;font-weight:700;white-space:nowrap}
+    .badge.safe{background:var(--gbg);color:var(--green);border:1px solid var(--gbd)}
+    .badge.warning{background:var(--ybg);color:var(--yellow);border:1px solid var(--ybd)}
+    .badge.danger{background:var(--rbg);color:var(--red);border:1px solid var(--rbd)}
+
+    .btn-lihat{padding:2px 8px;border-radius:4px;border:1px solid var(--blue2);color:var(--blue2);background:transparent;font-size:.65rem;cursor:pointer;font-weight:600;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:.2rem}
+    .btn-lihat:hover{background:var(--blue2);color:#fff}
+    .btn-del{width:26px;height:26px;border-radius:5px;border:1px solid var(--rbd);background:var(--rbg);color:var(--red);cursor:pointer;font-size:.82rem;display:flex;align-items:center;justify-content:center;transition:all .15s;margin:auto}
+    .btn-del:hover{background:var(--red);color:#fff}
+
+    .coord-txt{font-family:monospace;font-size:.68rem;color:var(--muted)}
+    .no-coord{font-size:.65rem;color:#cbd5e1;font-style:italic}
+    .empty-row{text-align:center;color:var(--muted);padding:2.5rem!important;font-style:italic}
+    .tbl-no{color:var(--muted);font-size:.68rem}
+
+    /* Foto thumbnail */
+    .foto-thumb{width:56px;height:40px;object-fit:cover;border-radius:5px;cursor:pointer;border:1px solid var(--border);transition:transform .15s;display:block}
+    .foto-thumb:hover{transform:scale(1.08)}
+
+    /* Pagination */
+    .tbl-footer{padding:.5rem 1rem;border-top:1px solid var(--border);background:#fafbff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
+    .tbl-info{font-size:.68rem;color:var(--muted)}
+    .pagination{display:flex;gap:2px}
+    .pg-btn{min-width:26px;height:26px;padding:0 .3rem;border-radius:5px;border:1px solid var(--border);background:#fff;color:var(--muted);font-size:.68rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:600;transition:all .15s}
+    .pg-btn.active{background:var(--blue2);border-color:var(--blue2);color:#fff}
+    .pg-btn:hover:not(.active){border-color:var(--blue2);color:var(--blue2)}
+
+    /* Modal foto */
+    .img-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;padding:1rem}
+    .img-modal.show{display:flex}
+    .img-modal-inner{position:relative;max-width:90vw;max-height:90vh}
+    .img-modal-img{max-width:100%;max-height:85vh;object-fit:contain;border-radius:10px;display:block;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+    .img-modal-close{position:absolute;top:-12px;right:-12px;width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;border:none;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700}
+    .img-modal-caption{position:absolute;bottom:-30px;left:0;right:0;text-align:center;color:rgba(255,255,255,.65);font-size:.7rem}
+
+    /* Footer */
+    .footer{text-align:center;padding:.6rem;font-size:.62rem;color:var(--muted);border-top:1px solid var(--border);background:#fff}
+
+    /* Responsive */
+    @media(max-width:900px){
+      .stat-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media(max-width:768px){
+      .sidebar{display:none}
+      .wrapper{margin-left:0}
+      .bottom-nav{display:block}
+      .content{padding:.85rem;padding-bottom:calc(3.8rem + var(--sab))}
+      .stat-grid{grid-template-columns:repeat(2,1fr)}
+      .search-input{width:120px}
+    }
+    @media(max-width:480px){
+      .stat-grid{grid-template-columns:1fr 1fr}
+      .top-title{font-size:.68rem}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Modal Foto -->
+<div class="img-modal" id="imgModal" onclick="closeModal()">
+  <div class="img-modal-inner" onclick="event.stopPropagation()">
+    <button class="img-modal-close" onclick="closeModal()">✕</button>
+    <img src="" alt="Hasil Deteksi" class="img-modal-img" id="modalImg"/>
+    <div class="img-modal-caption">Hasil Deteksi YOLOv8 · Klik di luar atau tekan Esc untuk menutup</div>
+  </div>
+</div>
+
+<!-- Sidebar Desktop -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">🛣️</div>
+      <div>
+        <div class="sb-logo-name">ROADWATCH</div>
+        <div class="sb-logo-sub">Sistem Deteksi<br>Lubang Jalan</div>
+      </div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <a class="sb-item" href="/dashboard"><span class="sb-icon">📊</span>Dashboard</a>
+    <a class="sb-item" href="/map"><span class="sb-icon">🗺️</span>Peta Lubang</a>
+    <a class="sb-item active" href="/history"><span class="sb-icon">📋</span>Riwayat Data</a>
+    <a class="sb-item" href="/gps"><span class="sb-icon">📡</span>GPS Tracker</a>
+  </nav>
+  <div class="sb-footer">© 2026 ROADWATCH<br>All Rights Reserved</div>
+</aside>
+
+<!-- Bottom Nav Mobile -->
+<nav class="bottom-nav">
+  <div class="bn-list">
+    <a class="bn-item" href="/dashboard"><span class="bn-icon">📊</span>Dashboard</a>
+    <a class="bn-item" href="/map"><span class="bn-icon">🗺️</span>Peta</a>
+    <a class="bn-item active" href="/history"><span class="bn-icon">📋</span>Riwayat</a>
+    <a class="bn-item" href="/gps"><span class="bn-icon">📡</span>GPS</a>
+  </div>
+</nav>
+
+<!-- Wrapper -->
+<div class="wrapper">
+  <div class="top-hdr">
+    <div class="top-title">📋 RIWAYAT DATA DETEKSI</div>
+    <div class="top-right">
+      <div class="top-time" id="clockTime">--:--:--</div>
+      <div class="sys-badge"><div class="sys-dot"></div>Sistem Aktif</div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Stat Summary -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-card-icon ic-b">📊</div>
+        <div>
+          <div class="stat-card-label">Total Deteksi</div>
+          <div class="stat-card-val c-blue" id="stTotal">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-icon ic-r">🚨</div>
+        <div>
+          <div class="stat-card-label">Status Bahaya</div>
+          <div class="stat-card-val c-red" id="stBahaya">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-icon ic-y">⚠️</div>
+        <div>
+          <div class="stat-card-label">Status Waspada</div>
+          <div class="stat-card-val c-yellow" id="stWaspada">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-icon ic-g">✅</div>
+        <div>
+          <div class="stat-card-label">Status Aman</div>
+          <div class="stat-card-val c-green" id="stAman">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabel Riwayat -->
+    <div class="white-card">
+      <div class="card-hdr">
+        <div class="card-hdr-title">📋 Log Semua Hasil Deteksi Lubang Jalan</div>
+        <div class="card-hdr-right">
+          <input class="search-input" placeholder="🔍 Cari data..." oninput="filterHist(this.value)"/>
+          <button class="btn-action btn-blue" onclick="exportCSV()">⬇ Export CSV</button>
+          <button class="btn-action btn-red" onclick="confirmDeleteAll()">🗑 Hapus Semua</button>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Waktu / Jam</th>
+              <th>Koordinat (Lat, Lng)</th>
+              <th>Jumlah Lubang</th>
+              <th>Status Kondisi</th>
+              <th>Akurasi</th>
+              <th>Foto Hasil</th>
+              <th>Action</th>
+              <th>Hapus</th>
+            </tr>
+          </thead>
+          <tbody id="histTbody">
+            <tr><td colspan="8" class="empty-row">⏳ Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tbl-footer">
+        <span class="tbl-info" id="tblInfo">–</span>
+        <div class="pagination" id="pgNav"></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="footer">ROADWATCH – Sistem Deteksi Lubang Jalan Berbasis YOLOv8, ESP32-CAM, dan GPS</div>
+</div>
+
+<script>
+  /* ── Jam ── */
+  function tick(){document.getElementById('clockTime').textContent=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+  setInterval(tick,1000);tick();
+
+  /* ── State ── */
+  let allHist=[],filtHist=[],curPage=1;
+  const PER=10;
+
+  /* ── Load Data ── */
+  async function loadHist(resetPage=false){
+    try{
+      const data=await fetch('/api/history').then(r=>r.json());
+      allHist=data; filtHist=[...data];
+      if(resetPage) curPage=1; // hanya reset kalau diminta
+      updateStats(data);
+      // Pastikan curPage tidak melebihi total halaman
+      const maxPage=Math.ceil(filtHist.length/PER);
+      if(curPage>maxPage) curPage=maxPage||1;
+      renderHist();
+    }catch(e){
+      document.getElementById('histTbody').innerHTML='<tr><td colspan="8" class="empty-row">❌ Gagal memuat data</td></tr>';
+    }
+  }
+
+  function updateStats(data){
+    document.getElementById('stTotal').textContent   = data.length;
+    document.getElementById('stBahaya').textContent  = data.filter(d=>d.color==='red').length;
+    document.getElementById('stWaspada').textContent = data.filter(d=>d.color==='yellow').length;
+    document.getElementById('stAman').textContent    = data.filter(d=>d.color==='green').length;
+  }
+
+  function filterHist(q){
+    filtHist=q?allHist.filter(d=>JSON.stringify(d).toLowerCase().includes(q.toLowerCase())):[...allHist];
+    curPage=1; renderHist();
+  }
+
+  function renderHist(){
+    const start=(curPage-1)*PER;
+    const page=filtHist.slice(start,start+PER);
+    const tbody=document.getElementById('histTbody');
+
+    if(!filtHist.length){
+      tbody.innerHTML='<tr><td colspan="8" class="empty-row">Belum ada data riwayat deteksi</td></tr>';
+      document.getElementById('tblInfo').textContent='–';
+      document.getElementById('pgNav').innerHTML='';
+      return;
+    }
+
+    tbody.innerHTML=page.map((d,i)=>{
+      const no=filtHist.length-(start+i);
+      const coord=(d.lat&&d.lng)
+        ?`<span class="coord-txt">${parseFloat(d.lat).toFixed(6)},<br>${parseFloat(d.lng).toFixed(6)}</span>`
+        :`<span class="no-coord">Tidak ada GPS</span>`;
+      const cls=d.color==='red'?'danger':d.color==='yellow'?'warning':'safe';
+      const foto=d.annotated_url
+        ?`<img src="${d.annotated_url}" class="foto-thumb" onclick="openModal('${d.annotated_url}')" title="Klik untuk perbesar"/>`
+        :`<span style="font-size:.65rem;color:#cbd5e1">Tidak ada</span>`;
+      const petaBtn=(d.lat&&d.lng)
+        ?`<a href="/map" class="btn-lihat">📍 Lihat Peta</a>`
+        :`<span style="font-size:.65rem;color:#cbd5e1">–</span>`;
+
+      const konfVal = d.confidence_avg
+        ? `<span style="font-weight:700;color:${d.confidence_avg>=0.7?'#16a34a':d.confidence_avg>=0.5?'#d97706':'#dc2626'}">${Math.round(d.confidence_avg*100)}%</span>`
+        : `<span style="color:#cbd5e1;font-size:.65rem">–</span>`;
+
+      return `<tr>
+        <td class="tbl-no">${no}</td>
+        <td style="white-space:nowrap">${d.timestamp}</td>
+        <td>${coord}</td>
+        <td style="text-align:center"><strong>${d.pothole_count}</strong></td>
+        <td><span class="badge ${cls}">${d.status}</span></td>
+        <td style="text-align:center">${konfVal}</td>
+        <td style="text-align:center">${foto}</td>
+        <td>${petaBtn}</td>
+        <td><button class="btn-del" onclick="deleteRow(${d.id})" title="Hapus data ini">🗑</button></td>
+      </tr>`;
+    }).join('');
+
+    const total=Math.ceil(filtHist.length/PER);
+    document.getElementById('tblInfo').textContent=
+      `Menampilkan ${start+1}–${Math.min(start+PER,filtHist.length)} dari ${filtHist.length} data`;
+
+    // Pagination pintar - tampilkan halaman sekitar curPage
+    let pg=`<button class="pg-btn" onclick="chgPg(${curPage-1})">‹</button>`;
+    
+    // Hitung range halaman yang ditampilkan
+    let startPg = Math.max(1, curPage - 3);
+    let endPg   = Math.min(total, curPage + 3);
+    
+    // Selalu tampilkan halaman 1
+    if(startPg > 1){
+      pg += `<button class="pg-btn" onclick="chgPg(1)">1</button>`;
+      if(startPg > 2) pg += `<span style="padding:0 4px;color:var(--muted)">...</span>`;
+    }
+    
+    // Tampilkan range halaman
+    for(let i=startPg; i<=endPg; i++)
+      pg+=`<button class="pg-btn${i===curPage?' active':''}" onclick="chgPg(${i})">${i}</button>`;
+    
+    // Selalu tampilkan halaman terakhir
+    if(endPg < total){
+      if(endPg < total-1) pg += `<span style="padding:0 4px;color:var(--muted)">...</span>`;
+      pg += `<button class="pg-btn" onclick="chgPg(${total})">${total}</button>`;
+    }
+    
+    pg+=`<button class="pg-btn" onclick="chgPg(${curPage+1})">›</button>`;
+    document.getElementById('pgNav').innerHTML=pg;
+  }
+
+  function chgPg(p){
+    const t=Math.ceil(filtHist.length/PER);
+    if(p<1||p>t)return; curPage=p; renderHist();
+  }
+
+  /* ── Modal Foto ── */
+  function openModal(url){
+    document.getElementById('modalImg').src=url+'?t='+Date.now();
+    document.getElementById('imgModal').classList.add('show');
+    document.body.style.overflow='hidden';
+  }
+  function closeModal(){
+    document.getElementById('imgModal').classList.remove('show');
+    document.body.style.overflow='';
+  }
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+  /* ── Export CSV ── */
+  function exportCSV(){
+    if(!allHist.length){alert('Belum ada data untuk diekspor.');return;}
+    const header='No,Waktu,Latitude,Longitude,Jumlah Lubang,Status,Akurasi (Confidence)';
+    const rows=allHist.map((d,i)=>
+      `${allHist.length-i},"${d.timestamp}",${d.lat||''},${d.lng||''},${d.pothole_count},${d.status},${d.confidence_avg?Math.round(d.confidence_avg*100)+'%':'–'}`
+    );
+    const blob=new Blob([[header,...rows].join('\n')],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`roadwatch_riwayat_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  /* ── Hapus ── */
+  async function deleteRow(id){
+    if(!confirm('Hapus data ini?'))return;
+    const savedPage = curPage; // simpan halaman saat ini
+    try{
+      const res=await fetch('/api/delete/'+id,{method:'DELETE'}).then(r=>r.json());
+      if(res.success){
+        // Refresh data tanpa reset halaman
+        const data=await fetch('/api/history').then(r=>r.json());
+        allHist=data; filtHist=[...data];
+        updateStats(data);
+        // Kembali ke halaman yang sama (atau halaman terakhir kalau data berkurang)
+        const maxPage = Math.ceil(filtHist.length/PER);
+        curPage = Math.min(savedPage, maxPage || 1);
+        renderHist();
+      } else alert('Gagal hapus: '+res.message);
+    }catch(e){alert('Koneksi gagal');}
+  }
+
+  async function confirmDeleteAll(){
+    if(!allHist.length){alert('Tidak ada data untuk dihapus.');return;}
+    if(!confirm(`Hapus SEMUA ${allHist.length} data riwayat?\nTindakan ini tidak bisa dibatalkan!`))return;
+    if(!confirm('Yakin? Data yang sudah dihapus tidak bisa dikembalikan.'))return;
+    try{
+      const res=await fetch('/api/delete/all',{method:'DELETE'}).then(r=>r.json());
+      if(res.success){ loadHist(); alert('Semua data berhasil dihapus.'); }
+    }catch(e){alert('Koneksi gagal');}
+  }
+
+  /* ── Init ── */
+  loadHist(true); // pertama kali buka, mulai dari halaman 1
+  setInterval(()=>loadHist(false), 10000); // refresh tiap 10 detik tanpa reset halaman
+</script>
+</body>
+</html>

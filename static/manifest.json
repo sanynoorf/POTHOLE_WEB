@@ -1,0 +1,12 @@
+{
+  "name": "ROADWATCH – Deteksi Lubang Jalan",
+  "short_name": "ROADWATCH",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0d1f4e",
+  "theme_color": "#1e4db7",
+  "icons": [
+    {"src":"/static/icons/icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"/static/icons/icon-512.png","sizes":"512x512","type":"image/png"}
+  ]
+}

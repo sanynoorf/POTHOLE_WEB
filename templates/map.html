@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Peta Lubang Jalan – PotholeWatch</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <style>
+    /* Kontainer Utama Sidebar */
+.sidebar {
+  width: 320px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1e293b; /* Warna latar sidebar */
+  overflow: hidden; /* Mencegah seluruh halaman ikut ter-scroll */
+}
+
+/* Kontainer Daftar Titik (#markerList) */
+#markerList {
+  flex: 1; /* Mengisi sisa ruang kosong di bawah tombol/stat */
+  overflow-y: auto; /* MENAMBAHKAN SCROLLBAR DI BAGIAN DAFTAR FOTO */
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Kustomisasi Scrollbar agar Rapi/Modern */
+#markerList::-webkit-scrollbar {
+  width: 6px;
+}
+#markerList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+#markerList::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Style Item Titik yang Bisa Diklik */
+.marker-item {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer; /* Mengubah kursor jadi bentuk tangan */
+  transition: all 0.2s ease;
+}
+
+.marker-item:hover {
+  border-color: #3b82f6;
+  background: #1e293b;
+  transform: translateY(-2px);
+}
+
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0f172a;--bg2:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--primary:#3b82f6;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--r:10px}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+    /* Topbar */
+    .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:.8rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;flex-shrink:0}
+    .brand{font-size:1rem;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:8px}
+    .nav{display:flex;gap:6px}
+    .nav a{padding:.35rem .85rem;border-radius:6px;border:1px solid var(--border);color:var(--muted);text-decoration:none;font-size:.78rem;transition:all .15s}
+    .nav a:hover{border-color:var(--primary);color:var(--primary)}
+    .nav a.active{background:var(--primary);border-color:var(--primary);color:#fff}
+
+    /* Layout */
+    .page{flex:1;display:flex;gap:0}
+
+    /* Sidebar info */
+    .sidebar{width:300px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+    .sidebar-header{padding:1rem;border-bottom:1px solid var(--border)}
+    .sidebar-title{font-size:.875rem;font-weight:700;margin-bottom:.75rem}
+
+    /* Stat mini */
+    .stat-row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem}
+    .stat-mini{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;text-align:center}
+    .stat-mini-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+    .stat-mini-val{font-size:1.3rem;font-weight:800}
+    .stat-mini-val.red{color:var(--red)}.stat-mini-val.yellow{color:var(--yellow)}.stat-mini-val.green{color:var(--green)}
+
+    /* Legend */
+    .legend{padding:.75rem 1rem;border-bottom:1px solid var(--border)}
+    .legend-title{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;font-weight:600}
+    .legend-item{display:flex;align-items:center;gap:8px;font-size:.78rem;padding:.2rem 0}
+    .legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+
+    /* List marker */
+    .marker-list{flex:1;overflow-y:auto}
+    .marker-item{padding:.7rem 1rem;border-bottom:1px solid rgba(51,65,85,.5);cursor:pointer;transition:background .15s}
+    .marker-item:hover{background:rgba(255,255,255,.04)}
+    .marker-item-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px}
+    .marker-badge{padding:2px 8px;border-radius:12px;font-size:.7rem;font-weight:700}
+    .marker-badge.green{background:rgba(34,197,94,.12);color:var(--green)}
+    .marker-badge.yellow{background:rgba(245,158,11,.12);color:var(--yellow)}
+    .marker-badge.red{background:rgba(239,68,68,.12);color:var(--red)}
+    .marker-count{font-weight:700;font-size:.85rem}
+    .marker-time{font-size:.72rem;color:var(--muted)}
+    .marker-coord{font-size:.7rem;color:var(--muted);font-family:monospace}
+    .marker-empty{padding:2rem;text-align:center;color:var(--muted);font-size:.82rem}
+
+    /* Tombol refresh */
+    .btn-refresh{width:100%;padding:.5rem;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text);font-size:.78rem;cursor:pointer;transition:all .15s;margin-top:.5rem}
+    .btn-refresh:hover{border-color:var(--primary);color:var(--primary)}
+
+    /* Peta */
+    #map{flex:1;min-height:400px}
+
+    /* Responsive */
+    @media(max-width:640px){
+      .page{flex-direction:column}
+      .sidebar{width:100%;max-height:240px}
+      #map{min-height:350px}
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">🛣️ ROADWATCH</div>
+  <nav class="nav">
+    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/map" class="active">🗺️ Peta</a>
+    <a href="/history">📋 Riwayat</a>
+    <a href="/gps">📡 GPS</a>
+  </nav>
+</header>
+
+<div class="page">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">🗺️ Peta Pemetaan Lubang Jalan</div>
+      <div class="stat-row">
+        <div class="stat-mini">
+          <div class="stat-mini-label">Total Titik</div>
+          <div class="stat-mini-val red" id="statTotal">0</div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-label">Total Lubang</div>
+          <div class="stat-mini-val yellow" id="statHoles">0</div>
+        </div>
+      </div>
+      <button class="btn-refresh" onclick="loadMarkers()">↻ Refresh Peta</button>
+    </div>
+
+    <div class="legend">
+      <div class="legend-title">Keterangan</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Bahaya (≥ 3 lubang)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Waspada (1–2 lubang)</div>
+    </div>
+
+    <div class="marker-list" id="markerList">
+      <div class="marker-empty">Belum ada data peta.<br>Mulai pengujian di jalan untuk melihat titik lubang.</div>
+    </div>
+  </div>
+
+  <!-- Peta Leaflet -->
+  <div id="map"></div>
+
+</div>
+
+<script>
+  // 1. Inisialisasi Peta Leaflet
+  const map = L.map('map').setView([-6.84, 106.92], 15);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // 2. Inisialisasi Cluster
+  let markersCluster;
+  if (typeof L.markerClusterGroup === 'function') {
+    markersCluster = L.markerClusterGroup({
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true
+    });
+    map.addLayer(markersCluster);
+  } else {
+    markersCluster = L.layerGroup().addTo(map);
+  }
+
+  let allMarkers = [];
+  let isFirstLoad = true;
+
+  // 3. Fungsi Utama Memuat Data
+  async function loadMarkers() {
+    try {
+      const response = await fetch('/api/history').then(r => r.json());
+      const rawData = Array.isArray(response) ? response : (response.data || []);
+
+      // Reset layer lama
+      markersCluster.clearLayers();
+      allMarkers = [];
+
+      // 🎯 FILTER: HANYA DATALUBANG > 0 DAN GPS VALID
+      const validPotholes = rawData.filter(d => {
+        const count = parseInt(d.pothole_count || 0);
+        return d && d.lat != null && d.lng != null && count > 0;
+      });
+
+      if (!validPotholes.length) {
+        document.getElementById('markerList').innerHTML =
+          '<div style="color:#94a3b8;padding:15px;text-align:center;">Belum ada titik lubang terdeteksi.</div>';
+        document.getElementById('statTotal').textContent = '0';
+        document.getElementById('statHoles').textContent = '0';
+        return;
+      }
+
+      let totalHolesAll = 0;
+
+      // Loop membuat titik marker
+      validPotholes.forEach((d, i) => {
+        const count = parseInt(d.pothole_count || 0);
+        const latVal = parseFloat(d.lat);
+        const lngVal = parseFloat(d.lng);
+
+        const isDanger = count >= 3;
+        const color = isDanger ? 'red' : 'yellow';
+        const statusText = isDanger ? 'Bahaya' : 'Waspada';
+
+        let markerOptions = {};
+        if (typeof makeIcon === 'function') {
+          try { markerOptions.icon = makeIcon(color); } catch(e) {}
+        }
+        
+        const marker = L.marker([latVal, lngVal], markerOptions);
+
+        const imgHtml = d.annotated_url
+          ? `<img src="${d.annotated_url}" style="width:100%;border-radius:6px;margin-top:6px;">`
+          : '';
+
+        marker.bindPopup(`
+          <div style="font-family:sans-serif;min-width:180px">
+            <b>${isDanger ? '🚨' : '⚠️'} ${statusText}</b><br>
+            🕳️ <strong>${count} lubang</strong><br>
+            🕐 ${d.timestamp || '-'}<br>
+            📍 ${latVal.toFixed(5)}, ${lngVal.toFixed(5)}
+            ${imgHtml}
+          </div>
+        `, { maxWidth: 240 });
+
+        markersCluster.addLayer(marker);
+
+        allMarkers.push({ marker, data: d });
+        totalHolesAll += count;
+      });
+
+      // Update Angka Statistik Header
+      document.getElementById('statTotal').textContent = validPotholes.length;
+      document.getElementById('statHoles').textContent = totalHolesAll;
+
+      // Render Daftar Sidebar (Teks Kiri, Gambar Kanan)
+      document.getElementById('markerList').innerHTML = validPotholes.map((d, i) => {
+        const count = parseInt(d.pothole_count || 0);
+        const latVal = parseFloat(d.lat);
+        const lngVal = parseFloat(d.lng);
+
+        const isDanger = count >= 3;
+        const badgeBg = isDanger ? '#ef4444' : '#f59e0b';
+        const statusText = isDanger ? 'Bahaya' : 'Waspada';
+        
+        const imgTag = d.annotated_url 
+          ? `<img src="${d.annotated_url}" style="width:70px;height:70px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;" onerror="this.style.display='none'">` 
+          : '';
+
+        return `
+          <div class="marker-item" onclick="flyTo(${i})" style="cursor:pointer; display:flex; gap:10px; align-items:center; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:bold; color:#fff; font-size:0.88rem;">🕳️ ${count} lubang</span>
+                <span style="background:${badgeBg}; color:#fff; font-size:0.68rem; padding:2px 6px; border-radius:4px; font-weight:bold;">${statusText}</span>
+              </div>
+              <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">${d.timestamp || ''}</div>
+              <div style="font-size:0.7rem; color:#64748b; font-family:monospace; margin-top:2px;">${latVal.toFixed(5)}, ${lngVal.toFixed(5)}</div>
+            </div>
+            ${imgTag}
+          </div>
+        `;
+      }).join('');
+
+      // Auto Bounds
+      if (allMarkers.length && isFirstLoad) {
+        if (typeof markersCluster.getBounds === 'function' && markersCluster.getBounds().isValid()) {
+          map.fitBounds(markersCluster.getBounds().pad(0.1));
+        }
+        isFirstLoad = false;
+      }
+
+    } catch (e) {
+      console.error('Error saat loadMarkers:', e);
+    }
+  }
+
+  // 4. Fungsi FlyTo
+  function flyTo(index) {
+    const item = allMarkers[index];
+    if (!item) return;
+
+    const latLng = item.marker.getLatLng();
+
+    map.flyTo(latLng, 18, { animate: true, duration: 1 });
+
+    setTimeout(() => {
+      if (typeof markersCluster.zoomToShowLayer === 'function') {
+        markersCluster.zoomToShowLayer(item.marker, () => {
+          item.marker.openPopup();
+        });
+      } else {
+        item.marker.openPopup();
+      }
+    }, 400);
+  }
+
+  // Jalankan fungsi
+  loadMarkers();
+</script>
+</body>
+</html>

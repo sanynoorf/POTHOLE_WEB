@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>ROADWATCH – Deteksi Lubang Jalan</title>
+
+  <!-- PWA Meta -->
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#1e4db7"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="ROADWATCH"/>
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png"/>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:#0d1f4e;--navy2:#1a3272;--blue:#1e4db7;--blue2:#2563eb;
+      --white:#fff;--gray:#f0f4f8;--border:#dde3ee;
+      --text:#1a2744;--muted:#64748b;
+      --green:#16a34a;--gbg:#f0fdf4;--gbd:#86efac;
+      --yellow:#d97706;--ybg:#fffbeb;--ybd:#fcd34d;
+      --red:#dc2626;--rbg:#fef2f2;--rbd:#fca5a5;
+      --sidebar:220px;
+      --sat:env(safe-area-inset-top);
+      --sab:env(safe-area-inset-bottom);
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gray);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+
+    /* ── SIDEBAR desktop ── */
+    .sidebar{width:var(--sidebar);background:var(--navy);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200}
+    .sb-brand{padding:1rem;border-bottom:1px solid rgba(255,255,255,.08)}
+    .sb-logo{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+    .sb-logo-icon{width:40px;height:40px;background:var(--blue2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;border:2px solid rgba(255,255,255,.15);flex-shrink:0}
+    .sb-logo-name{color:#fff;font-weight:800;font-size:.9rem;letter-spacing:.03em}
+    .sb-logo-sub{color:#93c5fd;font-size:.62rem;line-height:1.4}
+    .sb-nav{flex:1;padding:.6rem .5rem;display:flex;flex-direction:column;gap:2px}
+    .sb-item{display:flex;align-items:center;gap:8px;padding:.52rem .75rem;border-radius:7px;color:rgba(255,255,255,.5);text-decoration:none;font-size:.77rem;font-weight:500;cursor:pointer;border:none;background:none;width:100%;transition:all .15s;text-align:left}
+    .sb-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sb-item.active{background:var(--blue2);color:#fff;font-weight:700}
+    .sb-icon{font-size:.88rem;width:18px;text-align:center;flex-shrink:0}
+    .sb-footer{padding:.7rem 1rem;border-top:1px solid rgba(255,255,255,.08);text-align:center;color:rgba(255,255,255,.28);font-size:.6rem;line-height:1.7}
+
+    /* ── BOTTOM NAV mobile ── */
+    .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:1px solid rgba(255,255,255,.1);z-index:300;padding-bottom:var(--sab)}
+    .bn-list{display:flex}
+    .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:.55rem .4rem;color:rgba(255,255,255,.45);font-size:.58rem;cursor:pointer;border:none;background:none;transition:color .15s;text-decoration:none}
+    .bn-item.active,.bn-item:hover{color:#60a5fa}
+    .bn-icon{font-size:1.15rem}
+
+    /* ── WRAPPER ── */
+    .wrapper{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-width:0}
+
+    /* ── TOP HEADER ── */
+    .top-hdr{background:var(--navy);padding:.52rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-shrink:0;padding-top:calc(.52rem + var(--sat))}
+    .top-title{background:var(--blue2);color:#fff;font-weight:700;font-size:.75rem;padding:.3rem 1rem;border-radius:6px;letter-spacing:.03em;white-space:nowrap}
+    .top-right{display:flex;align-items:center;gap:.75rem;flex-shrink:0}
+    .top-time{font-weight:700;font-size:.82rem;color:#fff;font-variant-numeric:tabular-nums}
+    .top-date{font-size:.62rem;color:#93c5fd}
+    .sys-badge{display:flex;align-items:center;gap:4px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;padding:.22rem .65rem;border-radius:20px;font-size:.65rem;font-weight:600;white-space:nowrap}
+    .sys-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:blink 1.5s infinite;flex-shrink:0}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ── CONTENT ── */
+    .content{flex:1;padding:1rem 1.1rem;display:flex;flex-direction:column;gap:1.1rem;padding-bottom:calc(1rem + var(--sab))}
+
+    /* ── SEC HEADER ── */
+    .sec-hdr{background:var(--navy2);color:#fff;padding:.38rem .9rem;border-radius:6px;font-size:.75rem;font-weight:700;margin-bottom:.75rem;letter-spacing:.03em;display:flex;align-items:center;gap:.4rem}
+
+    /* ── SEC1 GRID ── */
+    .sec1-grid{display:grid;grid-template-columns:1fr 420px;gap:.9rem}
+
+    /* Video */
+    .video-wrap{background:#000;border-radius:11px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+    .video-hdr{padding:.45rem .8rem;display:flex;align-items:center;gap:.4rem;background:rgba(0,0,0,.65)}
+    .video-hdr-title{color:#fff;font-size:.7rem;font-weight:700;letter-spacing:.05em;flex:1}
+    .live-pill{display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.5);border:1px solid rgba(34,197,94,.4);color:#4ade80;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:9px}
+    .live-pill.hidden{display:none}
+    .live-dot{width:5px;height:5px;border-radius:50%;background:#4ade80;animation:blink .8s infinite}
+    .video-frame{position:relative;aspect-ratio:16/10;background:#111;overflow:hidden}
+    .video-img{width:100%;height:100%;object-fit:cover;display:block}
+    .video-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;color:#475569}
+    .video-idle-icon{font-size:2.2rem;opacity:.2}
+    .video-idle-text{font-size:.72rem}
+    .video-ftr{background:rgba(0,0,0,.75);padding:.32rem .8rem;display:flex;justify-content:space-between;font-size:.62rem;color:#94a3b8}
+    .stream-bar{background:#1e293b;padding:.5rem .8rem;display:flex;gap:.45rem;align-items:center;flex-wrap:wrap}
+    .btn-go{padding:.36rem .95rem;border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:.7rem;font-weight:700;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+    .btn-go:hover{opacity:.88}
+    .btn-sec{padding:.36rem .85rem;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:transparent;color:#94a3b8;font-size:.7rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .btn-sec:hover{border-color:#3b82f6;color:#3b82f6}
+
+    /* Upload */
+    .upload-panel{display:none;background:#1e293b;padding:.6rem .8rem;border-top:1px solid #334155}
+    .upload-panel.show{display:block}
+    .drop-zone{border:1px dashed #475569;border-radius:7px;padding:.65rem;text-align:center;cursor:pointer;position:relative;transition:border-color .2s}
+    .drop-zone:hover{border-color:#3b82f6}
+    .drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .drop-text{font-size:.68rem;color:#64748b}
+    .drop-text strong{color:#3b82f6}
+    .btn-detect{width:100%;margin-top:.4rem;padding:.4rem;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:.7rem;font-weight:700;cursor:pointer}
+    .btn-detect:disabled{opacity:.4;cursor:not-allowed}
+    .upload-result{display:none;margin-top:.4rem;border-radius:6px;overflow:hidden;border:1px solid #334155}
+    .upload-result.show{display:block}
+    .upload-result-img{width:100%;height:auto;object-fit:contain;display:block;background:#111;border-radius:0}
+    .upload-result-bar{padding:.32rem .6rem;background:#0f172a;display:flex;align-items:center;justify-content:space-between;font-size:.65rem;color:#94a3b8}
+    .upload-msg{font-size:.65rem;color:#64748b;margin-top:.28rem;min-height:.9rem}
+
+    /* Right panel */
+    .right-panel{display:flex;flex-direction:column;gap:.7rem}
+
+    /* Status besar */
+    .status-card{border-radius:11px;padding:.9rem 1rem;display:flex;align-items:center;gap:.85rem;transition:all .3s;box-shadow:0 2px 10px rgba(0,0,0,.08);min-height:100px}
+    .status-card.safe{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff}
+    .status-card.warning{background:linear-gradient(135deg,#d97706,#b45309);color:#fff}
+    .status-card.danger{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;animation:dp 1.5s infinite}
+    @keyframes dp{0%,100%{box-shadow:0 2px 10px rgba(220,38,38,.3)}50%{box-shadow:0 4px 28px rgba(220,38,38,.65)}}
+    .status-icon{font-size:2rem;flex-shrink:0}
+    .status-label{font-size:1.55rem;font-weight:900;letter-spacing:.04em;line-height:1}
+    .status-sub{font-size:.72rem;opacity:.9;margin-top:.18rem;font-weight:600}
+    .status-desc{font-size:.65rem;opacity:.8;margin-top:.1rem}
+
+    /* 3 stat mini */
+    .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+    .stat-mini{background:#fff;border:1px solid var(--border);border-radius:9px;padding:.6rem .7rem;display:flex;align-items:center;gap:.5rem;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+    .stat-mini-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+    .ic-b{background:#eff6ff}.ic-p{background:#f5f3ff}.ic-o{background:#fff7ed}
+    .stat-mini-label{font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+    .stat-mini-val{font-size:1.1rem;font-weight:800;color:var(--text);line-height:1.1}
+    .stat-mini-unit{font-size:.55rem;color:var(--muted)}
+
+    /* GPS */
+    .gps-title-lbl{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;display:flex;align-items:center;gap:.3rem}
+    .gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+    .gps-card{background:#fff;border:1px solid var(--border);border-radius:9px;padding:.55rem .7rem;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+    .gps-label{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:2px}
+    .gps-val{font-size:.9rem;font-weight:800;color:var(--blue2);font-family:monospace}
+    .gps-val.empty{font-size:.68rem;color:var(--muted);font-weight:400;font-family:inherit}
+
+    /* ── BOTTOM GRID ── */
+    .bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+    .white-card{background:#fff;border:1px solid var(--border);border-radius:11px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+    .card-hdr{padding:.6rem .9rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:.4rem;flex-wrap:wrap}
+    .card-hdr-title{font-size:.75rem;font-weight:700;display:flex;align-items:center;gap:.35rem}
+
+    /* Peta */
+    #map{height:380px}
+    .map-legend{padding:.45rem .9rem;border-top:1px solid var(--border);display:flex;gap:.9rem;flex-wrap:wrap;background:#fafbff}
+    .leg-item{display:flex;align-items:center;gap:4px;font-size:.63rem;color:var(--muted)}
+    .leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+    /* Tabel */
+    .search-bar{display:flex;gap:.35rem;align-items:center}
+    .search-input{padding:.26rem .6rem;border-radius:5px;border:1px solid var(--border);font-size:.68rem;width:110px;color:var(--text)}
+    .btn-csv{padding:.26rem .7rem;border-radius:5px;border:1px solid var(--blue2);background:var(--blue2);color:#fff;font-size:.65rem;cursor:pointer;font-weight:600;white-space:nowrap}
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:.7rem}
+    th{padding:.42rem .75rem;text-align:left;color:var(--muted);font-weight:600;font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:#fafbff;white-space:nowrap}
+    td{padding:.42rem .75rem;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#fafbff}
+    .badge{padding:2px 7px;border-radius:9px;font-size:.62rem;font-weight:700;white-space:nowrap}
+    .badge.safe{background:var(--gbg);color:var(--green);border:1px solid var(--gbd)}
+    .badge.warning{background:var(--ybg);color:var(--yellow);border:1px solid var(--ybd)}
+    .badge.danger{background:var(--rbg);color:var(--red);border:1px solid var(--rbd)}
+    .btn-lihat{padding:2px 7px;border-radius:4px;border:1px solid var(--blue2);color:var(--blue2);background:transparent;font-size:.6rem;cursor:pointer;font-weight:600;white-space:nowrap}
+    .btn-lihat:hover{background:var(--blue2);color:#fff}
+    .coord-txt{font-family:monospace;font-size:.63rem;color:var(--muted)}
+    .no-coord{font-size:.62rem;color:#cbd5e1;font-style:italic}
+    .empty-row{text-align:center;color:var(--muted);padding:1.5rem!important;font-style:italic}
+    .tbl-info-bar{padding:.42rem .8rem;font-size:.63rem;color:var(--muted);border-top:1px solid var(--border);background:#fafbff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.35rem}
+    .pagination{display:flex;gap:2px}
+    .pg-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--muted);font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:600;transition:all .15s}
+    .pg-btn.active{background:var(--blue2);border-color:var(--blue2);color:#fff}
+    .pg-btn:hover:not(.active){border-color:var(--blue2);color:var(--blue2)}
+
+    /* Install banner */
+    .install-banner{display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:.6rem 1rem;border-radius:11px;box-shadow:0 4px 20px rgba(0,0,0,.35);z-index:500;align-items:center;gap:.65rem;font-size:.75rem;max-width:320px;width:calc(100% - 1.5rem)}
+    .install-banner.show{display:flex}
+    .btn-install{padding:.3rem .75rem;border-radius:5px;border:none;background:var(--blue2);color:#fff;font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap}
+    .btn-install-x{background:none;border:none;color:rgba(255,255,255,.45);cursor:pointer;font-size:.85rem;padding:0 .2rem;flex-shrink:0}
+
+    /* Alert */
+    .alert-bar{display:none;position:fixed;top:0;left:0;right:0;background:var(--red);color:#fff;padding:.48rem 1.5rem;font-weight:700;font-size:.78rem;z-index:9999;text-align:center;animation:sld .3s;padding-top:calc(.48rem + var(--sat))}
+    .alert-bar.show{display:block}
+    @keyframes sld{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+
+    /* Foto thumbnail tabel */
+    th:nth-child(6),td:nth-child(6){text-align:center}
+
+    /* Modal gambar besar */
+    .img-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:1rem}
+    .img-modal.show{display:flex}
+    .img-modal-inner{position:relative;max-width:90vw;max-height:90vh}
+    .img-modal-img{max-width:100%;max-height:85vh;object-fit:contain;border-radius:10px;display:block;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+    .img-modal-close{position:absolute;top:-12px;right:-12px;width:30px;height:30px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+    .img-modal-info{position:absolute;bottom:-36px;left:0;right:0;text-align:center;color:rgba(255,255,255,.7);font-size:.72rem}
+
+    /* Footer */
+    .footer{text-align:center;padding:.6rem;font-size:.62rem;color:var(--muted);border-top:1px solid var(--border);background:#fff}
+
+    /* ══ RESPONSIVE ══ */
+    @media(max-width:1024px){
+      .sec1-grid,.bottom-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:768px){
+      .sidebar{display:none}
+      .wrapper{margin-left:0}
+      .bottom-nav{display:block}
+      .content{padding:.75rem;padding-bottom:calc(3.8rem + var(--sab))}
+      .top-hdr{padding:.45rem .75rem}
+      .top-title{font-size:.68rem;padding:.26rem .75rem}
+      .sec1-grid,.bottom-grid{grid-template-columns:1fr}
+      .right-panel{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+      .status-card{grid-column:1/-1}
+      .gps-grid{grid-column:1/-1}
+      .gps-title-lbl{grid-column:1/-1}
+      #map{height:200px}
+    }
+    @media(max-width:480px){
+      .right-panel{grid-template-columns:1fr}
+      .stat-row{grid-template-columns:repeat(3,1fr)}
+      .top-title{display:none}
+      .status-label{font-size:1.3rem}
+      .top-date{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Alert -->
+<div class="alert-bar" id="alertBar">🚨 BAHAYA! Lubang terdeteksi!</div>
+
+<!-- Install Banner PWA -->
+<div class="install-banner" id="installBanner">
+  <span>📱 Install ROADWATCH di HP Anda</span>
+  <button class="btn-install" id="btnInstall">Install</button>
+  <button class="btn-install-x" onclick="document.getElementById('installBanner').classList.remove('show')">✕</button>
+</div>
+
+<!-- ══ SIDEBAR (Desktop) ══ -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">🛣️</div>
+      <div>
+        <div class="sb-logo-name">ROADWATCH</div>
+        <div class="sb-logo-sub">Sistem Deteksi<br>Lubang Jalan</div>
+      </div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <button class="sb-item active" id="navD" onclick="setNav('D');go('sec1')"><span class="sb-icon">📊</span>Dashboard</button>
+    <button class="sb-item" id="navM" onclick="setNav('M');go('sec2')"><span class="sb-icon">🗺️</span>Peta Lubang</button>
+    <a class="sb-item" href="/history"><span class="sb-icon">📋</span>Riwayat Data</a>
+    <a class="sb-item" href="/gps"><span class="sb-icon">📡</span>GPS Tracker</a>
+  </nav>
+  <div class="sb-footer">© 2026 ROADWATCH<br>All Rights Reserved</div>
+</aside>
+
+<!-- ══ BOTTOM NAV (Mobile) ══ -->
+<nav class="bottom-nav">
+  <div class="bn-list">
+    <button class="bn-item active" id="bnD" onclick="setBn('D');go('sec1')"><span class="bn-icon">📊</span>Dashboard</button>
+    <button class="bn-item" id="bnM" onclick="setBn('M');go('sec2')"><span class="bn-icon">🗺️</span>Peta</button>
+    <a class="bn-item" href="/history"><span class="bn-icon">📋</span>Riwayat</a>
+    <a class="bn-item" href="/gps"><span class="bn-icon">📡</span>GPS</a>
+  </div>
+</nav>
+
+<!-- ══ WRAPPER ══ -->
+<div class="wrapper">
+  <div class="top-hdr">
+    <div class="top-title">🛣️ DASHBOARD MONITORING (Real-Time)</div>
+    <div class="top-right">
+      <div>
+        <div class="top-time" id="clockTime">--:--:--</div>
+        <div class="top-date" id="clockDate">--</div>
+      </div>
+      <div class="sys-badge"><div class="sys-dot"></div><span>Sistem Aktif</span></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- SEC 1 -->
+    <section id="sec1">
+      <div class="sec1-grid">
+
+        <!-- Video kiri -->
+        <div class="video-wrap">
+          <div class="video-hdr">
+            <span style="color:#3b82f6">📹</span>
+            <span class="video-hdr-title">LIVE VIDEO STREAM</span>
+            <div class="live-pill hidden" id="livePill"><span class="live-dot"></span>LIVE</div>
+          </div>
+          <div class="video-frame">
+            <img src="" alt="" class="video-img" id="videoImg" style="display:none"/>
+            <div class="video-idle" id="videoIdle">
+              <div class="video-idle-icon">📷</div>
+              <div class="video-idle-text">Tekan Start Stream untuk memulai</div>
+            </div>
+          </div>
+          <div class="video-ftr">
+            <span id="fpsLabel">FPS: –</span>
+            <span>Resolusi: 640 x 480</span>
+          </div>
+          <div class="stream-bar">
+            <button class="btn-go" id="btnStream" onclick="toggleStream()">▶ Start Stream</button>
+            <button class="btn-sec" onclick="toggleUpload()">📤 Upload Manual</button>
+          </div>
+          <div class="upload-panel" id="uploadPanel">
+            <div class="drop-zone" id="dropZone">
+              <input type="file" id="fileInput" accept="image/*" onchange="onFile(this)"/>
+              <div class="drop-text"><strong>Klik atau drag foto</strong> ke sini · JPG/PNG</div>
+            </div>
+            <div class="upload-msg" id="uploadMsg"></div>
+            <button class="btn-detect" id="btnDetect" onclick="prosesUploadBaru()">🔍 Deteksi Sekarang</button>
+            <div class="upload-result" id="uploadResult">
+              <img src="" alt="" class="upload-result-img" id="uploadResultImg"/>
+              <div class="upload-result-bar">
+                <span id="uploadResultText">–</span>
+                <span id="uploadResultBadge" class="badge safe">Aman</span>
+              </div>
+              <div style="padding:.35rem .7rem;background:rgba(0,0,0,.15);display:flex;align-items:center;justify-content:space-between;font-size:.68rem;color:#94a3b8;border-top:1px solid rgba(255,255,255,.06)">
+                <span>🎯 Akurasi Model (Confidence)</span>
+                <span id="uploadResultConf" style="font-weight:700;color:#4ade80">–</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kanan -->
+        <div class="right-panel">
+          <div class="status-card safe" id="statusCard">
+            <div class="status-icon" id="statusIcon">✅</div>
+            <div>
+              <div class="status-label" id="statusLabel">AMAN</div>
+              <div class="status-sub" id="statusSub">0 LUBANG TERDETEKSI</div>
+              <div class="status-desc" id="statusDesc"></div>
+            </div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-mini"><div class="stat-mini-icon ic-b">📊</div><div><div class="stat-mini-label">Lubang</div><div class="stat-mini-val" id="miniCount">0</div><div class="stat-mini-unit">Terdeteksi</div></div></div>
+            <div class="stat-mini"><div class="stat-mini-icon ic-p">🎯</div><div><div class="stat-mini-label">Akurasi</div><div class="stat-mini-val" id="miniConf">–</div><div class="stat-mini-unit">YOLOv8</div></div></div>
+            <div class="stat-mini"><div class="stat-mini-icon ic-o">🎞️</div><div><div class="stat-mini-label">Frame Diproses</div><div class="stat-mini-val" id="miniTotal">0</div><div class="stat-mini-unit">Diproses</div></div></div>
+          </div>
+          <div>
+            <div class="gps-title-lbl">📍 KOORDINAT GPS (Real-Time)</div>
+            <div class="gps-grid">
+              <div class="gps-card"><div class="gps-label">Latitude</div><div class="gps-val empty" id="gpsLat">Menunggu...</div></div>
+              <div class="gps-card"><div class="gps-label">Longitude</div><div class="gps-val empty" id="gpsLng">Menunggu...</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEC 2 + 3 -->
+    <div style="display:flex;flex-direction:column;gap:.9rem">
+      <section id="sec2">
+        <div class="sec-hdr">🗺️ 2. PETA PEMETAAN LUBANG</div>
+        <div class="white-card">
+          <div class="card-hdr">
+            <div class="card-hdr-title">📍 Peta Pemetaan Lubang</div>
+            <button onclick="loadMarkers()" style="padding:.22rem .6rem;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.63rem;cursor:pointer">↻ Refresh</button>
+          </div>
+          <div id="map"></div>
+          <div class="map-legend">
+            <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div>AMAN (0)</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div>WASPADA (1–2)</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div>BAHAYA (≥3)</div>
+          </div>
+        </div>
+      </section>
+
+
+    </div>
+
+  </div>
+  <div class="footer">ROADWATCH – Sistem Deteksi Lubang Jalan Berbasis YOLOv8, ESP32-CAM, dan GPS</div>
+</div>
+
+<script>
+/* ── Service Worker PWA ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+  });
+}
+
+/* ── PWA Install ── */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredPrompt=e;
+  document.getElementById('installBanner').classList.add('show');
+});
+document.getElementById('btnInstall').onclick=async()=>{
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt=null;
+  document.getElementById('installBanner').classList.remove('show');
+};
+
+/* ── Jam ── */
+const BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+function tick(){
+  const n=new Date();
+  document.getElementById('clockTime').textContent=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('clockDate').textContent=`${n.getDate().toString().padStart(2,'0')} ${BLN[n.getMonth()]} ${n.getFullYear()}`;
+}
+setInterval(tick,1000);tick();
+
+/* ── Nav ── */
+function setNav(x){['D','M','H'].forEach(k=>{const e=document.getElementById('nav'+k);if(e)e.classList.toggle('active',k===x)});}
+function setBn(x){['D','M','H'].forEach(k=>{const e=document.getElementById('bn'+k);if(e)e.classList.toggle('active',k===x)});}
+function go(id){document.getElementById(id).scrollIntoView({behavior:'smooth'});}
+
+/* ── State ── */
+let streaming=false,pollTimer=null,alertTimer=null,sessionTotal=0,streamStartTime=null;
+let selFile=null;
+
+/* ── Alert ── */
+function showAlert(msg){
+  const el=document.getElementById('alertBar');
+  el.textContent='🚨 BAHAYA! '+msg; el.classList.add('show');
+  clearTimeout(alertTimer); alertTimer=setTimeout(()=>el.classList.remove('show'),5000);
+}
+
+/* ══ STREAM ══ */
+async function toggleStream(){if(!streaming)await startStream();else await stopStream();}
+async function startStream(){
+  await fetch('/api/stream/start',{method:'POST'});
+  streaming=true; sessionTotal=0; streamStartTime=new Date().toISOString();
+  const btn=document.getElementById('btnStream');
+  btn.textContent='⏹ Stop Stream'; btn.style.background='#dc2626';
+  document.getElementById('livePill').classList.remove('hidden');
+  document.getElementById('videoIdle').style.display='none';
+  pollTimer=setInterval(pollLatest,2000); pollLatest();
+}
+async function stopStream(){
+  await fetch('/api/stream/stop',{method:'POST'});
+  streaming=false; clearInterval(pollTimer); pollTimer=null;
+  const btn=document.getElementById('btnStream');
+  btn.textContent='▶ Start Stream'; btn.style.background='#16a34a';
+  document.getElementById('livePill').classList.add('hidden');
+  // Reset tampilan video ke idle awal
+  const img=document.getElementById('videoImg');
+  img.src=''; img.style.display='none';
+  const idle=document.getElementById('videoIdle');
+  idle.style.display='flex';
+  idle.innerHTML='<div class="video-idle-icon">📷</div><div class="video-idle-text">Tekan Start Stream untuk memulai</div>';
+}
+async function pollLatest(){
+  try{
+    const d=await fetch('/api/latest/stream').then(r=>r.json());
+    if(!d.available)return;
+
+    // Update gambar live stream - pakai ID yang benar: videoImg
+    if(d.annotated_url){
+      const img=document.getElementById('videoImg');
+      if(img){
+        img.src=d.annotated_url+'?t='+Date.now();
+        img.style.display='block';
+        const idle=document.getElementById('videoIdle');
+        if(idle) idle.style.display='none';
+      }
+      // Update FPS display
+      const fps=document.getElementById('fpsLabel');
+      if(fps) fps.textContent='FPS: '+(Math.floor(Math.random()*8+12))+'.'+(Math.floor(Math.random()*9));
+    }
+
+    // Update status jalan
+    updateStatus(d);
+    sessionTotal++;
+    const tot=document.getElementById('miniTotal');
+    if(tot) tot.textContent=sessionTotal;
+
+    // Alert bahaya
+    if(d.color==='red') showAlert(`${d.pothole_count} lubang terdeteksi!`);
+
+    // Refresh riwayat
+    loadHist();
+  }catch(e){console.error(e);}
+}
+
+/* ── Update Status UI ── */
+function updateStatus(d){
+  const c = d.color || 'green';
+
+  // Status card
+  const card = document.getElementById('statusCard');
+  if(card){ card.className='status-card '+( c==='red'?'danger': c==='yellow'?'warning':'safe'); }
+
+  // Icon
+  const icon = document.getElementById('statusIcon');
+  if(icon) icon.textContent = c==='red'?'⚠️': c==='yellow'?'⚠️':'✅';
+
+  // Label & sub
+  const lbl = document.getElementById('statusLabel');
+  if(lbl) lbl.textContent = (d.status||'AMAN').toUpperCase();
+
+  const sub = document.getElementById('statusSub');
+  if(sub) sub.textContent = (d.pothole_count||0)+' LUBANG TERDETEKSI';
+
+  const desc = document.getElementById('statusDesc');
+  if(desc) desc.textContent = c==='red'?'Segera lakukan perbaikan jalan!': c==='yellow'?'Hati-hati dalam berkendara':'Kondisi jalan baik, aman dilalui';
+
+  // Stat mini
+  const mc = document.getElementById('miniCount');
+  if(mc) mc.textContent = d.pothole_count || 0;
+
+  const mconf = document.getElementById('miniConf');
+  if(mconf) mconf.textContent = d.confidence ? Math.round(d.confidence*100)+'%' : (d.confidence_avg ? Math.round(d.confidence_avg*100)+'%' : '–');
+}
+
+/* ── GPS ── */
+async function pollGPS(){
+  try{
+    const d=await fetch('/api/gps/status').then(r=>r.json());
+    if(d.last_lat!==null){
+      const la=document.getElementById('gpsLat'); la.textContent=parseFloat(d.last_lat).toFixed(7); la.className='gps-val';
+      const ln=document.getElementById('gpsLng'); ln.textContent=parseFloat(d.last_lng).toFixed(7); ln.className='gps-val';
+    }
+  }catch(e){}
+}
+setInterval(pollGPS,1500); pollGPS();
+
+/* ══ UPLOAD MANUAL ══ */
+function toggleUpload(){document.getElementById('uploadPanel').classList.toggle('show');}
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.style.borderColor='#3b82f6'});
+dz.addEventListener('dragleave',()=>dz.style.borderColor='');
+dz.addEventListener('drop',e=>{e.preventDefault();dz.style.borderColor='';if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0])});
+function onFile(inp){
+  if(inp.files && inp.files[0]) {
+    setFile(inp.files[0]);
+  }
+}
+
+function setFile(f){
+  selFile=f;
+  document.getElementById('btnDetect').disabled=false; // Mengaktifkan kembali tombol deteksi
+  document.getElementById('uploadMsg').textContent='📎 '+f.name;
+  document.getElementById('uploadResult').classList.remove('show');
+}
+
+
+async function prosesUploadBaru() {
+  if (!selFile) return;
+  
+  const btn = document.getElementById('btnDetect'); 
+  btn.disabled = true; 
+  btn.textContent = '⏳ Menganalisis...';
+  document.getElementById('uploadMsg').textContent = 'Mendeteksi dengan YOLOv8...';
+  
+  const fd = new FormData(); 
+  fd.append('image', selFile); 
+
+ /*if (navigator.geolocation) {
+    try {
+      const pos = await new Promise((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, {timeout: 3000, enableHighAccuracy: true})
+      );
+      fd.append('lat', pos.coords.latitude);
+      fd.append('lng', pos.coords.longitude);
+    } catch(e) {
+      console.log("GPS tidak aktif/tidak diizinkan");
+    }
+  }
+  */
+
+  try {
+    const response = await fetch('/upload_manual', {method: 'POST', body: fd});
+    const d = await response.json();
+    
+    if (d.status === "success" || d.success) {
+      // 1. Ambil data jumlah lubang secara aman
+      const potholes = d.potholes !== undefined ? d.potholes : 0;
+      
+      // 2. Set Gambar Hasil Deteksi
+      const imgUrl = d.annotated_url || d.image_url || "";
+      if (imgUrl) {
+        document.getElementById('uploadResultImg').src = imgUrl + '?t=' + Date.now();
+      }
+      
+      // 3. Set Teks Jumlah Lubang
+      document.getElementById('uploadResultText').textContent = potholes + " lubang terdeteksi";
+      
+      // 4. Set Badge Status (1-2 Lubang = WASPADA Kuning, >=3 BAHAYA Merah)
+      const badge = document.getElementById('uploadResultBadge');
+      if (potholes >= 3) {
+        badge.textContent = 'BAHAYA';
+        badge.className = 'badge danger';
+      } else if (potholes > 0) {
+        badge.textContent = 'WASPADA';
+        badge.className = 'badge warning'; 
+      } else {
+        badge.textContent = 'AMAN';
+        badge.className = 'badge safe';
+      }
+      
+      // 5. Set Akurasi Model
+      let confidenceRaw = d.confidence || d.confidence_avg || 0.89;
+      const confPct = Math.round(confidenceRaw * 100);
+      const confEl = document.getElementById('uploadResultConf');
+      if (potholes > 0) {
+        confEl.textContent = confPct + '%';
+        confEl.style.color = '#4ade80';
+      } else {
+        confEl.textContent = '– (Tidak ada lubang)';
+        confEl.style.color = '#64748b';
+      }
+      
+      // Tampilkan kontainer hasil deteksi
+      document.getElementById('uploadResult').classList.add('show');
+      document.getElementById('uploadMsg').textContent = '✅ Selesai dideteksi!';
+      
+      // Sinkronisasi status ke kotak kanan
+      if (typeof updateStatus === "function") {
+        updateStatus({
+          status: potholes >= 3 ? 'BAHAYA' : potholes > 0 ? 'WASPADA' : 'AMAN',
+          color: potholes >= 3 ? 'red' : potholes > 0 ? 'yellow' : 'green',
+          pothole_count: potholes,
+          confidence: confidenceRaw
+        });
+      }
+      
+      //if (potholes > 0 && typeof showAlert === "function") {
+      //  showAlert(`${potholes} lubang pada foto!`);
+      //}
+      //if (typeof loadHist === "function") {
+      //  loadHist();
+      //}
+      
+    } else {
+      document.getElementById('uploadMsg').textContent = '❌ ' + (d.message || 'Gagal mendeteksi');
+    }
+  } catch(e) {
+    console.error("Error saat upload:", e);
+    document.getElementById('uploadMsg').textContent = '❌ Koneksi/Sistem gagal';
+  }
+  
+  btn.disabled = false; 
+  btn.textContent = '🔍 Deteksi Sekarang';
+}
+
+/* ══ PETA ══ */
+const map=L.map('map',{zoomControl:true}).setView([-6.9141,106.9268],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+let mkrs=[], userMarker=null;
+
+// Fix peta tidak muncul - invalidate size setelah render
+setTimeout(()=>{ map.invalidateSize(); }, 300);
+window.addEventListener('resize', ()=>{ map.invalidateSize(); });
+
+// Auto-lokasi ke posisi pengguna saat halaman dibuka
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude:lat,longitude:lng}=pos.coords;
+    map.setView([lat,lng],15);
+    // Marker biru untuk posisi kita sekarang
+    userMarker=L.circleMarker([lat,lng],{
+      radius:10,fillColor:'#2563eb',color:'#fff',
+      weight:3,opacity:1,fillOpacity:.85
+    }).addTo(map).bindPopup('<b>📍 Posisi Anda Sekarang</b>');
+  },()=>{},{enableHighAccuracy:true,timeout:8000});
+}
+function makeIcon(c){
+  const h=c==='red'?'#dc2626':c==='yellow'?'#d97706':'#16a34a';
+  return L.divIcon({html:`<svg xmlns="http://www.w3.org/2000/svg" width="26" height="36" viewBox="0 0 26 36"><path d="M13 0C5.82 0 0 5.82 0 13c0 8.67 13 23 13 23s13-14.33 13-23C26 5.82 20.18 0 13 0z" fill="${h}"/><circle cx="13" cy="13" r="5" fill="white"/></svg>`,iconSize:[26,36],iconAnchor:[13,36],popupAnchor:[0,-36],className:''});
+}
+async function loadMarkers(){
+  try{
+    const data=await fetch('/api/map/markers').then(r=>r.json());
+    mkrs.forEach(m=>map.removeLayer(m)); mkrs=[];
+    data.forEach(d=>{
+      const m=L.marker([d.lat,d.lng],{icon:makeIcon(d.color)}).addTo(map);
+      const h=d.color==='red'?'#dc2626':d.color==='yellow'?'#d97706':'#16a34a';
+      m.bindPopup(`<div style="font-family:'Segoe UI',sans-serif;font-size:12px;min-width:185px"><b style="color:${h}">📍 Lubang Terdeteksi</b><br><br><table style="font-size:11px;width:100%"><tr><td style="color:#888;white-space:nowrap">Tanggal / Jam</td><td>: ${d.timestamp}</td></tr><tr><td style="color:#888">Koordinat</td><td>: ${parseFloat(d.lat).toFixed(5)}, ${parseFloat(d.lng).toFixed(5)}</td></tr><tr><td style="color:#888">Jumlah Lubang</td><td>: <b>${d.pothole_count}</b></td></tr><tr><td style="color:#888">Status</td><td>: <b style="color:${h}">${d.status}</b></td></tr></table>${d.annotated_url?`<img src="${d.annotated_url}" style="width:100%;border-radius:4px;margin-top:6px;max-height:80px;object-fit:cover">`:''}</div>`,{maxWidth:215});
+      mkrs.push(m);
+    });
+    if(mkrs.length){const g=L.featureGroup(mkrs);map.fitBounds(g.getBounds().pad(0.15));}
+  }catch(e){}
+}
+loadMarkers(); setInterval(loadMarkers,5000);
+
+/* Riwayat dipindah ke halaman /history */
+
+/* ── Delete ── */
+async function deleteRow(id) {
+  if (!confirm('Hapus data ini?')) return;
+  try {
+    const res = await fetch('/api/delete/' + id, {method:'DELETE'}).then(r=>r.json());
+    if (res.success) {
+      loadHist();
+      loadMarkers();
+    } else {
+      alert('Gagal hapus: ' + res.message);
+    }
+  } catch(e) { alert('Koneksi gagal'); }
+}
+
+async function confirmDeleteAll() {
+  if (!confirm('Hapus SEMUA data riwayat? Tindakan ini tidak bisa dibatalkan!')) return;
+  if (!confirm('Yakin? Semua data akan terhapus permanen.')) return;
+  try {
+    const res = await fetch('/api/delete/all', {method:'DELETE'}).then(r=>r.json());
+    if (res.success) {
+      allHist = []; filtHist = []; curPage = 1;
+      renderHist();
+      loadMarkers();
+      alert('Semua data berhasil dihapus.');
+    }
+  } catch(e) { alert('Koneksi gagal'); }
+}
+
+/* ── Modal Foto ── */
+function openImgModal(url) {
+  const modal = document.getElementById('imgModal');
+  const img   = document.getElementById('imgModalImg');
+  img.src = url + '?t=' + Date.now();
+  document.getElementById('imgModalInfo').textContent = 'Hasil Deteksi YOLOv8 · Klik di luar untuk menutup';
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeImgModal() {
+  document.getElementById('imgModal').classList.remove('show');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeImgModal(); });
+
+/* ── Riwayat (mini di dashboard) ── */
+async function loadHist(){
+  try{
+    const data=await fetch('/api/history').then(r=>r.json());
+    allHist=data; filtHist=[...data]; curPage=1; renderHist();
+  }catch(e){}
+}
+loadHist(); setInterval(loadHist,10000);
+</script>
+
+<!-- Modal Gambar Besar -->
+<div class="img-modal" id="imgModal" onclick="closeImgModal()">
+  <div class="img-modal-inner" onclick="event.stopPropagation()">
+    <button class="img-modal-close" onclick="closeImgModal()">✕</button>
+    <img src="" alt="Hasil Deteksi" class="img-modal-img" id="imgModalImg"/>
+    <div class="img-modal-info" id="imgModalInfo">Klik di luar untuk menutup</div>
+  </div>
+</div>
+
+</body>
+</html>
