@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# YOLO model
+*.pt
+
+# Database
+*.db
+
+# Environment
+.env
+venv/
+.venv/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# ngrok
+*.zip
+
+# Upload hasil deteksi
+static/uploads/
+static/detections/
